@@ -1,0 +1,104 @@
+# Project Summary: Internal IT Ticketing Desktop App
+
+## 1. Project definition
+
+**Goal:** A lightweight, secure desktop application for logging, assigning, and resolving internal IT tickets.
+**Team:** Solo developer.
+**Users:** Internal staff (requesters, IT agents, admins).
+**Principle:** Smallest thing that works, with security built in from day one.
+
+## 2. Architecture
+
+```
+Desktop Client  ──HTTPS/TLS──►  Thin API Server  ──►  PostgreSQL
+(.NET 8 + Avalonia)             (ASP.NET Core)         + private file storage
+        │                              │
+   OS keychain                  Entra ID / OIDC (SSO)
+   (token storage)              SMTP (notifications)
+```
+
+All permissions are enforced on the server. The client never connects to the database directly.
+
+## 3. Final tech stack
+
+| Layer | Choice |
+|---|---|
+| Client | .NET 8 + Avalonia, MVVM (CommunityToolkit.Mvvm) |
+| Server | ASP.NET Core minimal API + EF Core |
+| Database | PostgreSQL (or SQL Server if your company already runs it) |
+| Auth | Entra ID / OIDC SSO; tokens in Windows Credential Manager |
+| Files | Private storage, served only via authenticated endpoint |
+| Notifications | SMTP email, with a background worker |
+| Packaging | MSIX or Velopack with signed auto-updates |
+| Hosting | One VM, Docker Compose, behind VPN/internal network |
+| CI/CD | GitHub Actions or Azure DevOps |
+
+*Note: if you prefer Tauri + TypeScript or PySide6, the architecture stays the same and only the client changes.*
+
+## 4. MVP scope (v1)
+
+**In:**
+- SSO login
+- Create, view, edit, list, search, and filter tickets
+- Status flow: New → In Progress → Pending → Resolved → Closed
+- Assignment, public comments, internal notes
+- Attachments (secure upload/download)
+- Roles: Requester, Agent, Admin
+- Email notifications
+- Audit log
+- Basic dashboard and simple SLA due dates
+
+**Out (for now):** email-to-ticket, Slack/Teams, automation rules, knowledge base, AI features, mobile app, multi-tenancy, microservices.
+
+## 5. Roadmap
+
+| Phase | Duration | Deliverables |
+|---|---|---|
+| **0. Discovery** | 1-2 weeks | Interview 3-5 users, confirm build vs. buy, confirm hosting/SSO with IT/security, define "done" for v1 |
+| **1. Foundation** | Week 1 | Private repo, Docker Compose, CI, pre-commit hooks (gitleaks), SSO login, basic client shell |
+| **2. Core tickets** | Week 2 | Data model, CRUD, status flow, audit log |
+| **3. Roles and workflow** | Week 3 | RBAC, assignment, internal notes, search/filters, authorization tests |
+| **4. Notifications and files** | Week 4 | Email notifications, secure attachments |
+| **5. Polish and pilot** | Weeks 5-6 | Dashboard, SLA dates, backups, monitoring, signed installer, pilot with one team |
+| **6. Iterate** | Ongoing | Feedback, email-to-ticket, automation, KB |
+
+## 6. Security checklist (summary)
+
+- **Auth:** SSO + MFA via company IdP; short-lived tokens in OS keychain
+- **Authorization:** server-side checks on every request; default deny; test against IDOR
+- **Input/output:** parameterized queries via ORM; validate all input; sanitize any rich text
+- **Files:** type and size limits, random filenames, private storage, optional ClamAV scan
+- **Transport:** TLS everywhere, certificate validation on, internal network/VPN only
+- **Secrets:** none in binary or git; secrets manager or Docker secrets
+- **Data:** encryption at rest, least-privilege DB user, encrypted and tested backups
+- **Logging:** append-only audit log; never log passwords, tokens, or ticket contents
+- **Supply chain:** pinned dependencies, `dotnet list package --vulnerable`, SAST (CodeQL/Semgrep), Dependabot
+- **Distribution:** code-signed installer and updates
+- **Process:** authorization tests first, one external security review before launch, a written runbook
+
+## 7. Core data model
+
+`User` · `Team` · `Ticket` · `Comment` (public/internal) · `Attachment` · `Category` · `AuditLog` · `SlaPolicy`
+
+## 8. Key risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Solo maintenance burden | Keep scope small, document everything, write a runbook |
+| Scope creep | Written definition of "done" for v1; park extras in a backlog |
+| Authorization bugs (IDOR) | Test suite that tries cross-user access; server-side filtering |
+| Data loss | Automated encrypted backups, with restore tests |
+| No code reviewer | CI automation, SAST, one external review before launch |
+| Duplicates existing tools | Do the build-vs-buy check in Phase 0 |
+
+## 9. Immediate next steps
+
+1. Run Phase 0: talk to users and check with IT/security about SSO, hosting, and compliance
+2. Create the private Git repo and add the README with this plan
+3. Scaffold the solution: `Server/`, `Client/`, `Shared/`, `Tests/`, plus `docker-compose.yml`
+4. Add CI, `gitleaks`, and dependency scanning
+5. Implement SSO login, then the `Ticket` model with the first authorization test
+
+---
+
+-- geloxh --
