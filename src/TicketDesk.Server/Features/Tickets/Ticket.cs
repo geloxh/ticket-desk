@@ -22,3 +22,24 @@ public class Ticket
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; private set; } = DateTime.UtcNow;
     public DateTime? DueAt { get; private set; }
+
+    private static readonly Dictionary<TicketStatus, TicketStatus[]> Allowed = new()
+    {
+        [TicketStatus.New] = [TicketStatus.InProgress, TicketStatus.Closed],
+        [TicketStatus.InProgress] = [TicketStatus.Pending, TicketStatus.Resolved],
+        [TicketStatus.Pending] = [TicketStatus.InProgress, TicketStatus.Resolved],
+        [TicketStatus.Resolved] = [TicketStatus.Closed, TicketStatus.InProgress],
+        [TicketStatus.Closed] = [],
+    };
+
+    public bool TryChangeStatus(TicketStatus next, out string? error)
+    {
+        if (!Allowed[Status].Contains(next))
+        {
+            error = $"{Status} -> {next} is not allowed.";
+            return false;
+        }
+        Status = next;
+        UpdatedAt = DateTime.UtcNow;
+    }
+}
